@@ -65,3 +65,46 @@ def test_ignores_unrelated_topics():
         market("2", "Will rainfall be above 120 millimeters by December 31?"),
     ])
     assert relations == []
+
+
+def test_year_before_threshold_does_not_become_threshold():
+    relations = analyze_relations([
+        market("1", "In 2026 will Bitcoin be above $100000?"),
+        market("2", "In 2026 will Bitcoin be above $120000?"),
+    ])
+    assert len(relations) == 1
+    assert relations[0].kind == RelationKind.IMPLIES
+
+
+def test_inclusive_and_strict_boundaries_are_not_duplicates():
+    relations = analyze_relations([
+        market("1", "Will Bitcoin be above $100000?"),
+        market("2", "Will Bitcoin be at least $100000?"),
+    ])
+    assert len(relations) == 1
+    assert relations[0].kind == RelationKind.IMPLIES
+
+
+def test_same_boundary_strict_opposites_are_mutually_exclusive():
+    relations = analyze_relations([
+        market("1", "Will Bitcoin be above $100000?"),
+        market("2", "Will Bitcoin be below $100000?"),
+    ])
+    assert len(relations) == 1
+    assert relations[0].kind == RelationKind.MUTUALLY_EXCLUSIVE
+
+
+def test_same_boundary_inclusive_opposites_are_not_marked_exclusive():
+    relations = analyze_relations([
+        market("1", "Will Bitcoin be at least $100000?"),
+        market("2", "Will Bitcoin be at most $100000?"),
+    ])
+    assert relations == []
+
+
+def test_incompatible_units_are_not_related():
+    relations = analyze_relations([
+        market("1", "Will approval be above 50%?"),
+        market("2", "Will approval be above $50?"),
+    ])
+    assert relations == []
