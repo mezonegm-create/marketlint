@@ -55,11 +55,70 @@ def _similar_topic(left: Market, right: Market) -> bool:
     return len(a & b) / min(len(a), len(b)) >= 0.6
 
 
-def analyze_relations(markets: list[Market]) -> list[MarketRelation]:
-    """Find deterministic logical tensions among sibling markets.
+def _yes_price(market: Market) -> float | None:
+    for index, outcome in enumerate(market.outcomes):
+        if outcome.strip().lower() == "yes" and index < len(market.prices):
+            return market.prices[index]
+    return None
 
-    Unknown relationships are deliberately left unclassified rather than guessed.
-    """
+
+def _price_check(
+    kind: RelationKind,
+    left: Market,
+    right: Market,
+    lt: tuple[str, float],
+    rt: tuple[str, float],
+) -> tuple[bool | None, str | None]:
+    lp = _yes_price(left)
+    rp = _yes_price(right)
+    if lp is None or rp is None:
+        return None, None
+
+    if kind == RelationKind.DUPLICATE:
+        ok = abs(lp - rp) <= 0.02
+        return ok, f"YES prices are {lp:.3f} and {rp:.3f}; duplicate markets differ by {abs(lp - rp):.3f}."
+
+    if kind == RelationKind.MUTUALLY_EXCLUSIVE:
+        total = lp + rp
+        ok = total <= 1.02
+        return ok, f"Mutually exclusive YES prices sum to {total:.3f}."
+
+    ldir, lvalue = lt
+    rdir, rvalue = rt
+    left_is_tighter = lvalue > rvalue if ldir == "above" else lvalue < rvalue
+    tighter_price, looser_price = (lp, rp) if left_is_tighter else (rp, lp)
+    ok = tighter_price <= looser_price + 0.02
+    return ok, f"Tighter-threshold YES price is {tighter_price:.3f}; looser-threshold YES price is {looser_price:.3f}."
+
+
+def _relation(
+    *,
+    kind: RelationKind,
+    left: Market,
+    right: Market,
+    lt: tuple[str, float],
+    rt: tuple[str, float],
+    severity: Severity,
+    title: str,
+    detail: str,
+) -> MarketRelation:
+    price_consistent, price_detail = _price_check(kind, left, right, lt, rt)
+    if price_consistent is False:
+        severity = Severity.WARNING
+    return MarketRelation(
+        kind=kind,
+        severity=severity,
+        left_market_id=left.market_id,
+        right_market_id=right.market_id,
+        title=title,
+        detail=detail,
+        price_consistent=price_consistent,
+        price_detail=price_detail,
+    )
+
+
+def analyze_relations(markets: list[Market]) -> list[MarketRelation]:
+    """Find deterministic logical relations and price tensions among siblings."""
     relations: list[MarketRelation] = []
     for left, right in combinations(markets, 2):
         if not _similar_topic(left, right):
@@ -71,40 +130,48 @@ def analyze_relations(markets: list[Market]) -> list[MarketRelation]:
         ldir, lvalue = lt
         rdir, rvalue = rt
         if ldir == rdir and lvalue == rvalue:
-            relations.append(MarketRelation(
+            relations.append(_relation(
                 kind=RelationKind.DUPLICATE,
+                left=left,
+                right=right,
+                lt=lt,
+                rt=rt,
                 severity=Severity.WARNING,
-                left_market_id=left.market_id,
-                right_market_id=right.market_id,
                 title="Potential duplicate threshold markets",
                 detail="Sibling markets appear to ask the same directional threshold question.",
             ))
         elif ldir == "above" and rdir == "below" and lvalue >= rvalue:
-            relations.append(MarketRelation(
+            relations.append(_relation(
                 kind=RelationKind.MUTUALLY_EXCLUSIVE,
+                left=left,
+                right=right,
+                lt=lt,
+                rt=rt,
                 severity=Severity.INFO,
-                left_market_id=left.market_id,
-                right_market_id=right.market_id,
                 title="Mutually exclusive threshold pair",
                 detail=f"Both YES outcomes cannot hold if the value must be above {lvalue:g} and below {rvalue:g}.",
             ))
         elif ldir == "below" and rdir == "above" and rvalue >= lvalue:
-            relations.append(MarketRelation(
+            relations.append(_relation(
                 kind=RelationKind.MUTUALLY_EXCLUSIVE,
+                left=left,
+                right=right,
+                lt=lt,
+                rt=rt,
                 severity=Severity.INFO,
-                left_market_id=left.market_id,
-                right_market_id=right.market_id,
                 title="Mutually exclusive threshold pair",
                 detail=f"Both YES outcomes cannot hold if the value must be below {lvalue:g} and above {rvalue:g}.",
             ))
         elif ldir == rdir:
             tighter = max(lvalue, rvalue) if ldir == "above" else min(lvalue, rvalue)
             looser = min(lvalue, rvalue) if ldir == "above" else max(lvalue, rvalue)
-            relations.append(MarketRelation(
+            relations.append(_relation(
                 kind=RelationKind.IMPLIES,
+                left=left,
+                right=right,
+                lt=lt,
+                rt=rt,
                 severity=Severity.INFO,
-                left_market_id=left.market_id,
-                right_market_id=right.market_id,
                 title="Nested threshold markets",
                 detail=f"A YES at the tighter {tighter:g} threshold implies YES at the looser {looser:g} threshold, assuming identical resolution scope.",
             ))
