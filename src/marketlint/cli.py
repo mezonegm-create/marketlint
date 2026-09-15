@@ -70,10 +70,19 @@ def lint(url: str, json_output: bool = typer.Option(False, "--json", help="Emit 
         _render_market(report)
 
     if event.relations:
-        relations = Table("Kind", "Markets", "Relation")
+        relations = Table("Kind", "Markets", "Price check", "Relation")
         for item in event.relations:
             pair = f"{item.left_market_id or '-'} ↔ {item.right_market_id or '-'}"
-            relations.add_row(item.kind.value.upper(), pair, item.detail)
+            if item.price_consistent is True:
+                price_check = "PASS"
+            elif item.price_consistent is False:
+                price_check = "TENSION"
+            else:
+                price_check = "N/A"
+            detail = item.detail
+            if item.price_detail:
+                detail = f"{detail} {item.price_detail}"
+            relations.add_row(item.kind.value.upper(), pair, price_check, detail)
         console.print("\n[bold]Cross-market relations[/bold]")
         console.print(relations)
 
