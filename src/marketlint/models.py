@@ -19,6 +19,12 @@ class TestStatus(StrEnum):
     NOT_APPLICABLE = "not_applicable"
 
 
+class RelationKind(StrEnum):
+    DUPLICATE = "duplicate"
+    IMPLIES = "implies"
+    MUTUALLY_EXCLUSIVE = "mutually_exclusive"
+
+
 class Finding(BaseModel):
     code: str
     severity: Severity
@@ -65,6 +71,15 @@ class Counterexample(BaseModel):
     question: str
 
 
+class MarketRelation(BaseModel):
+    kind: RelationKind
+    severity: Severity
+    left_market_id: str | None = None
+    right_market_id: str | None = None
+    title: str
+    detail: str
+
+
 class LintReport(BaseModel):
     market: Market
     findings: list[Finding] = Field(default_factory=list)
@@ -77,3 +92,15 @@ class LintReport(BaseModel):
         return any(item.severity == Severity.ERROR for item in self.findings) or any(
             item.status == TestStatus.FAIL for item in self.tests
         )
+
+
+class EventReport(BaseModel):
+    platform: str = "polymarket"
+    url: HttpUrl
+    slug: str
+    markets: list[LintReport] = Field(default_factory=list)
+    relations: list[MarketRelation] = Field(default_factory=list)
+
+    @property
+    def has_errors(self) -> bool:
+        return any(report.has_errors for report in self.markets)
