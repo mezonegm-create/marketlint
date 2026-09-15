@@ -3,17 +3,17 @@ from marketlint.models import Market, Severity
 
 
 def market(**overrides):
-    data = dict(
-        platform="polymarket",
-        url="https://polymarket.com/event/example",
-        question="Will X happen before December 31?",
-        description="The market resolves based on the stated rules.",
-        resolution_rules="X must happen before December 31.",
-        resolution_source=None,
-        end_time="2026-12-31T23:59:00Z",
-        outcomes=["Yes", "No"],
-        prices=[0.6, 0.4],
-    )
+    data = {
+        "platform": "polymarket",
+        "url": "https://polymarket.com/event/example",
+        "question": "Will X happen before December 31?",
+        "description": "The market resolves based on the stated rules.",
+        "resolution_rules": "X must happen before December 31.",
+        "resolution_source": None,
+        "end_time": "2026-12-31T23:59:00Z",
+        "outcomes": ["Yes", "No"],
+        "prices": [0.6, 0.4],
+    }
     data.update(overrides)
     return Market(**data)
 
