@@ -1,49 +1,88 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
+from enum import StrEnum
 from itertools import combinations
 
 from marketlint.models import Market, MarketRelation, RelationKind, Severity
 
-_NUMBER = re.compile(
-    r"(?:\$|€|£)?\s*([0-9]+(?:\.[0-9]+)?)\s*(%|percent|million|billion|k|m|b)?",
-    re.IGNORECASE,
-)
-_ABOVE = re.compile(
-    r"\b(above|over|more than|exceed(?:s|ed|ing)?|at least|greater than)\b",
-    re.IGNORECASE,
-)
-_BELOW = re.compile(
-    r"\b(below|under|less than|at most|fewer than|lower than)\b",
-    re.IGNORECASE,
-)
+PRICE_TOLERANCE = 0.02
 
 
-def _threshold(question: str) -> tuple[str, float] | None:
-    number = _NUMBER.search(question)
-    if not number:
+class Comparator(StrEnum):
+    GT = "gt"
+    GTE = "gte"
+    LT = "lt"
+    LTE = "lte"
+
+
+@dataclass(frozen=True)
+class Threshold:
+    comparator: Comparator
+    value: float
+    unit: str | None = None
+
+
+_COMPARATOR = (
+    r"(?P<comparator>above|over|more than|exceed(?:s|ed|ing)?|at least|greater than|"
+    r"below|under|less than|at most|fewer than|lower than)"
+)
+_VALUE = (
+    r"(?P<currency>[$€£])?\s*(?P<number>[0-9]+(?:\.[0-9]+)?)\s*"
+    r"(?P<suffix>%|percent|million|billion|k|m|b)?"
+)
+_THRESHOLD = re.compile(rf"\b{_COMPARATOR}\b\s*{_VALUE}", re.IGNORECASE)
+
+_COMPARATORS = {
+    "above": Comparator.GT,
+    "over": Comparator.GT,
+    "more than": Comparator.GT,
+    "exceed": Comparator.GT,
+    "exceeds": Comparator.GT,
+    "exceeded": Comparator.GT,
+    "exceeding": Comparator.GT,
+    "greater than": Comparator.GT,
+    "at least": Comparator.GTE,
+    "below": Comparator.LT,
+    "under": Comparator.LT,
+    "less than": Comparator.LT,
+    "fewer than": Comparator.LT,
+    "lower than": Comparator.LT,
+    "at most": Comparator.LTE,
+}
+
+
+def _threshold(question: str) -> Threshold | None:
+    match = _THRESHOLD.search(question)
+    if not match:
         return None
-    value = float(number.group(1))
-    suffix = (number.group(2) or "").lower()
+    value = float(match.group("number"))
+    suffix = (match.group("suffix") or "").lower()
     if suffix in {"million", "m"}:
         value *= 1_000_000
     elif suffix in {"billion", "b"}:
         value *= 1_000_000_000
     elif suffix == "k":
         value *= 1_000
-    if _ABOVE.search(question):
-        return "above", value
-    if _BELOW.search(question):
-        return "below", value
-    return None
+
+    currency = match.group("currency")
+    if currency:
+        unit = currency
+    elif suffix in {"%", "percent"}:
+        unit = "%"
+    else:
+        unit = None
+    return Threshold(_COMPARATORS[match.group("comparator").lower()], value, unit)
 
 
 def _topic(question: str) -> str:
-    text = question.lower()
-    text = _NUMBER.sub(" ", text)
-    text = _ABOVE.sub(" ", text)
-    text = _BELOW.sub(" ", text)
-    text = re.sub(r"\b(will|be|by|before|after|on|in|at|the|a|an|is|does|do|of|to)\b", " ", text)
+    text = _THRESHOLD.sub(" ", question.lower())
+    text = re.sub(
+        r"\b(will|be|by|before|after|on|in|at|the|a|an|is|does|do|of|to)\b",
+        " ",
+        text,
+    )
     return " ".join(re.findall(r"[a-z]{3,}", text))
 
 
@@ -55,6 +94,10 @@ def _similar_topic(left: Market, right: Market) -> bool:
     return len(a & b) / min(len(a), len(b)) >= 0.6
 
 
+def _compatible_units(left: Threshold, right: Threshold) -> bool:
+    return left.unit == right.unit
+
+
 def _yes_price(market: Market) -> float | None:
     for index, outcome in enumerate(market.outcomes):
         if outcome.strip().lower() == "yes" and index < len(market.prices):
@@ -62,12 +105,22 @@ def _yes_price(market: Market) -> float | None:
     return None
 
 
+def _direction(threshold: Threshold) -> str:
+    return "above" if threshold.comparator in {Comparator.GT, Comparator.GTE} else "below"
+
+
+def _strictness_key(threshold: Threshold) -> tuple[float, int]:
+    if _direction(threshold) == "above":
+        return threshold.value, int(threshold.comparator == Comparator.GT)
+    return -threshold.value, int(threshold.comparator == Comparator.LT)
+
+
 def _price_check(
     kind: RelationKind,
     left: Market,
     right: Market,
-    lt: tuple[str, float],
-    rt: tuple[str, float],
+    lt: Threshold,
+    rt: Threshold,
 ) -> tuple[bool | None, str | None]:
     lp = _yes_price(left)
     rp = _yes_price(right)
@@ -75,20 +128,25 @@ def _price_check(
         return None, None
 
     if kind == RelationKind.DUPLICATE:
-        ok = abs(lp - rp) <= 0.02
-        return ok, f"YES prices are {lp:.3f} and {rp:.3f}; duplicate markets differ by {abs(lp - rp):.3f}."
+        difference = abs(lp - rp)
+        return (
+            difference <= PRICE_TOLERANCE,
+            f"YES prices are {lp:.3f} and {rp:.3f}; duplicate markets differ by "
+            f"{difference:.3f}.",
+        )
 
     if kind == RelationKind.MUTUALLY_EXCLUSIVE:
         total = lp + rp
-        ok = total <= 1.02
-        return ok, f"Mutually exclusive YES prices sum to {total:.3f}."
+        return total <= 1 + PRICE_TOLERANCE, f"Mutually exclusive YES prices sum to {total:.3f}."
 
-    ldir, lvalue = lt
-    _, rvalue = rt
-    left_is_tighter = lvalue > rvalue if ldir == "above" else lvalue < rvalue
+    left_is_tighter = _strictness_key(lt) > _strictness_key(rt)
     tighter_price, looser_price = (lp, rp) if left_is_tighter else (rp, lp)
-    ok = tighter_price <= looser_price + 0.02
-    return ok, f"Tighter-threshold YES price is {tighter_price:.3f}; looser-threshold YES price is {looser_price:.3f}."
+    ok = tighter_price <= looser_price + PRICE_TOLERANCE
+    return (
+        ok,
+        f"Tighter-threshold YES price is {tighter_price:.3f}; "
+        f"looser-threshold YES price is {looser_price:.3f}.",
+    )
 
 
 def _relation(
@@ -96,8 +154,8 @@ def _relation(
     kind: RelationKind,
     left: Market,
     right: Market,
-    lt: tuple[str, float],
-    rt: tuple[str, float],
+    lt: Threshold,
+    rt: Threshold,
     severity: Severity,
     title: str,
     detail: str,
@@ -117,6 +175,21 @@ def _relation(
     )
 
 
+def _mutually_exclusive(lt: Threshold, rt: Threshold) -> bool:
+    ld, rd = _direction(lt), _direction(rt)
+    if ld == rd:
+        return False
+    above, below = (lt, rt) if ld == "above" else (rt, lt)
+    if above.value > below.value:
+        return True
+    if above.value < below.value:
+        return False
+    # At the same boundary, both can be true only when both include equality.
+    return not (
+        above.comparator == Comparator.GTE and below.comparator == Comparator.LTE
+    )
+
+
 def analyze_relations(markets: list[Market]) -> list[MarketRelation]:
     """Find deterministic logical relations and price tensions among siblings."""
     relations: list[MarketRelation] = []
@@ -125,54 +198,52 @@ def analyze_relations(markets: list[Market]) -> list[MarketRelation]:
             continue
         lt = _threshold(left.question)
         rt = _threshold(right.question)
-        if not lt or not rt:
+        if not lt or not rt or not _compatible_units(lt, rt):
             continue
-        ldir, lvalue = lt
-        rdir, rvalue = rt
-        if ldir == rdir and lvalue == rvalue:
-            relations.append(_relation(
-                kind=RelationKind.DUPLICATE,
-                left=left,
-                right=right,
-                lt=lt,
-                rt=rt,
-                severity=Severity.WARNING,
-                title="Potential duplicate threshold markets",
-                detail="Sibling markets appear to ask the same directional threshold question.",
-            ))
-        elif ldir == "above" and rdir == "below" and lvalue >= rvalue:
-            relations.append(_relation(
-                kind=RelationKind.MUTUALLY_EXCLUSIVE,
-                left=left,
-                right=right,
-                lt=lt,
-                rt=rt,
-                severity=Severity.INFO,
-                title="Mutually exclusive threshold pair",
-                detail=f"Both YES outcomes cannot hold if the value must be above {lvalue:g} and below {rvalue:g}.",
-            ))
-        elif ldir == "below" and rdir == "above" and rvalue >= lvalue:
-            relations.append(_relation(
-                kind=RelationKind.MUTUALLY_EXCLUSIVE,
-                left=left,
-                right=right,
-                lt=lt,
-                rt=rt,
-                severity=Severity.INFO,
-                title="Mutually exclusive threshold pair",
-                detail=f"Both YES outcomes cannot hold if the value must be below {lvalue:g} and above {rvalue:g}.",
-            ))
-        elif ldir == rdir:
-            tighter = max(lvalue, rvalue) if ldir == "above" else min(lvalue, rvalue)
-            looser = min(lvalue, rvalue) if ldir == "above" else max(lvalue, rvalue)
-            relations.append(_relation(
-                kind=RelationKind.IMPLIES,
-                left=left,
-                right=right,
-                lt=lt,
-                rt=rt,
-                severity=Severity.INFO,
-                title="Nested threshold markets",
-                detail=f"A YES at the tighter {tighter:g} threshold implies YES at the looser {looser:g} threshold, assuming identical resolution scope.",
-            ))
+
+        ld, rd = _direction(lt), _direction(rt)
+        if lt == rt:
+            relations.append(
+                _relation(
+                    kind=RelationKind.DUPLICATE,
+                    left=left,
+                    right=right,
+                    lt=lt,
+                    rt=rt,
+                    severity=Severity.WARNING,
+                    title="Potential duplicate threshold markets",
+                    detail="Sibling markets appear to ask the same threshold question.",
+                )
+            )
+        elif _mutually_exclusive(lt, rt):
+            relations.append(
+                _relation(
+                    kind=RelationKind.MUTUALLY_EXCLUSIVE,
+                    left=left,
+                    right=right,
+                    lt=lt,
+                    rt=rt,
+                    severity=Severity.INFO,
+                    title="Mutually exclusive threshold pair",
+                    detail="Both YES outcomes cannot hold under the parsed threshold semantics.",
+                )
+            )
+        elif ld == rd:
+            tighter = left if _strictness_key(lt) > _strictness_key(rt) else right
+            looser = right if tighter is left else left
+            relations.append(
+                _relation(
+                    kind=RelationKind.IMPLIES,
+                    left=left,
+                    right=right,
+                    lt=lt,
+                    rt=rt,
+                    severity=Severity.INFO,
+                    title="Nested threshold markets",
+                    detail=(
+                        f"YES on market {tighter.market_id or 'tighter'} implies YES on market "
+                        f"{looser.market_id or 'looser'}, assuming identical resolution scope."
+                    ),
+                )
+            )
     return relations
