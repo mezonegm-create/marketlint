@@ -12,6 +12,13 @@ class Severity(StrEnum):
     ERROR = "error"
 
 
+class TestStatus(StrEnum):
+    PASS = "pass"
+    WARNING = "warning"
+    FAIL = "fail"
+    NOT_APPLICABLE = "not_applicable"
+
+
 class Finding(BaseModel):
     code: str
     severity: Severity
@@ -34,10 +41,39 @@ class Market(BaseModel):
     raw: dict = Field(default_factory=dict, exclude=True)
 
 
+class NormalizedRules(BaseModel):
+    text: str
+    timezone: str | None = None
+    has_boundary_language: bool = False
+    has_exact_boundary_language: bool = False
+    has_fallback_language: bool = False
+    source: str | None = None
+    deadline: datetime | None = None
+
+
+class MarketTest(BaseModel):
+    code: str
+    name: str
+    status: TestStatus
+    detail: str
+
+
+class Counterexample(BaseModel):
+    code: str
+    title: str
+    scenario: str
+    question: str
+
+
 class LintReport(BaseModel):
     market: Market
     findings: list[Finding] = Field(default_factory=list)
+    normalized_rules: NormalizedRules | None = None
+    tests: list[MarketTest] = Field(default_factory=list)
+    counterexamples: list[Counterexample] = Field(default_factory=list)
 
     @property
     def has_errors(self) -> bool:
-        return any(item.severity == Severity.ERROR for item in self.findings)
+        return any(item.severity == Severity.ERROR for item in self.findings) or any(
+            item.status == TestStatus.FAIL for item in self.tests
+        )
