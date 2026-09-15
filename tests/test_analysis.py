@@ -5,17 +5,17 @@ from marketlint.normalizer import normalize_rules
 
 
 def market(**overrides):
-    data = dict(
-        platform="polymarket",
-        url="https://polymarket.com/event/example",
-        question="Will BTC exceed $150,000 before December 31?",
-        description="Resolution is based on Example Source.",
-        resolution_rules="BTC must exceed $150,000 before 23:59 UTC on December 31.",
-        resolution_source="Example Source",
-        end_time="2026-12-31T23:59:00Z",
-        outcomes=["Yes", "No"],
-        prices=[0.6, 0.4],
-    )
+    data = {
+        "platform": "polymarket",
+        "url": "https://polymarket.com/event/example",
+        "question": "Will BTC exceed $150,000 before December 31?",
+        "description": "Resolution is based on Example Source.",
+        "resolution_rules": "BTC must exceed $150,000 before 23:59 UTC on December 31.",
+        "resolution_source": "Example Source",
+        "end_time": "2026-12-31T23:59:00Z",
+        "outcomes": ["Yes", "No"],
+        "prices": [0.6, 0.4],
+    }
     data.update(overrides)
     return Market(**data)
 
