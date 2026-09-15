@@ -84,7 +84,7 @@ def _price_check(
         return ok, f"Mutually exclusive YES prices sum to {total:.3f}."
 
     ldir, lvalue = lt
-    rdir, rvalue = rt
+    _, rvalue = rt
     left_is_tighter = lvalue > rvalue if ldir == "above" else lvalue < rvalue
     tighter_price, looser_price = (lp, rp) if left_is_tighter else (rp, lp)
     ok = tighter_price <= looser_price + 0.02
