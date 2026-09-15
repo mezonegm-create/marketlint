@@ -29,13 +29,29 @@ def lint(url: str, json_output: bool = typer.Option(False, "--json", help="Emit 
 
     console.print(f"\n[bold]{market.question}[/bold]")
     console.print(f"Platform: {market.platform}  |  Market ID: {market.market_id or '-'}")
-    table = Table("Code", "Severity", "Finding")
+
+    findings = Table("Code", "Severity", "Finding")
     for item in report.findings:
-        table.add_row(item.code, item.severity.value.upper(), item.title)
+        findings.add_row(item.code, item.severity.value.upper(), item.title)
     if report.findings:
-        console.print(table)
-    else:
-        console.print("[green]No findings from the currently implemented rules.[/green]")
+        console.print("\n[bold]Findings[/bold]")
+        console.print(findings)
+
+    tests = Table("Test", "Status", "Detail")
+    for item in report.tests:
+        tests.add_row(item.code, item.status.value.upper(), item.detail)
+    console.print("\n[bold]Market Unit Tests[/bold]")
+    console.print(tests)
+
+    if report.counterexamples:
+        console.print("\n[bold]Counterexamples to inspect[/bold]")
+        for case in report.counterexamples:
+            console.print(f"[bold]{case.code} — {case.title}[/bold]")
+            console.print(f"  Scenario: {case.scenario}")
+            console.print(f"  Question: {case.question}")
+
+    if not report.findings:
+        console.print("\n[green]No findings from the currently implemented lint rules.[/green]")
     raise typer.Exit(code=1 if report.has_errors else 0)
 
 
