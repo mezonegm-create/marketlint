@@ -6,27 +6,17 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from marketlint.adapters.polymarket import fetch_market
+from marketlint.adapters.polymarket import _slug_from_url, fetch_markets
 from marketlint.linter import lint_market
+from marketlint.models import EventReport
+from marketlint.relations import analyze_relations
 
 app = typer.Typer(no_args_is_help=True, help="Lint and debug prediction markets.")
 console = Console()
 
 
-@app.command()
-def lint(url: str, json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON.")) -> None:
-    """Inspect a Polymarket market URL using deterministic checks."""
-    try:
-        market = fetch_market(url)
-        report = lint_market(market)
-    except Exception as exc:
-        console.print(f"[red]MarketLint failed:[/red] {exc}")
-        raise typer.Exit(code=2) from exc
-
-    if json_output:
-        typer.echo(json.dumps(report.model_dump(mode="json"), indent=2, ensure_ascii=False))
-        raise typer.Exit(code=1 if report.has_errors else 0)
-
+def _render_market(report) -> None:
+    market = report.market
     console.print(f"\n[bold]{market.question}[/bold]")
     console.print(f"Platform: {market.platform}  |  Market ID: {market.market_id or '-'}")
 
@@ -52,7 +42,42 @@ def lint(url: str, json_output: bool = typer.Option(False, "--json", help="Emit 
 
     if not report.findings:
         console.print("\n[green]No findings from the currently implemented lint rules.[/green]")
-    raise typer.Exit(code=1 if report.has_errors else 0)
+
+
+@app.command()
+def lint(url: str, json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON.")) -> None:
+    """Inspect a Polymarket market or all child markets in an event."""
+    try:
+        markets = fetch_markets(url)
+        reports = [lint_market(market) for market in markets]
+        event = EventReport(
+            url=url,
+            slug=_slug_from_url(url),
+            markets=reports,
+            relations=analyze_relations(markets),
+        )
+    except Exception as exc:
+        console.print(f"[red]MarketLint failed:[/red] {exc}")
+        raise typer.Exit(code=2) from exc
+
+    if json_output:
+        typer.echo(json.dumps(event.model_dump(mode="json"), indent=2, ensure_ascii=False))
+        raise typer.Exit(code=1 if event.has_errors else 0)
+
+    if len(reports) > 1:
+        console.print(f"\n[bold]Event: {event.slug}[/bold] — {len(reports)} child markets")
+    for report in reports:
+        _render_market(report)
+
+    if event.relations:
+        relations = Table("Kind", "Markets", "Relation")
+        for item in event.relations:
+            pair = f"{item.left_market_id or '-'} ↔ {item.right_market_id or '-'}"
+            relations.add_row(item.kind.value.upper(), pair, item.detail)
+        console.print("\n[bold]Cross-market relations[/bold]")
+        console.print(relations)
+
+    raise typer.Exit(code=1 if event.has_errors else 0)
 
 
 if __name__ == "__main__":
