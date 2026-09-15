@@ -134,11 +134,11 @@ def _price_check(
 
     if kind == RelationKind.DUPLICATE:
         difference = abs(lp - rp)
-        return (
-            difference <= PRICE_TOLERANCE,
+        detail = (
             f"YES prices are {lp:.3f} and {rp:.3f}; duplicate markets differ by "
-            f"{difference:.3f}.",
+            f"{difference:.3f}."
         )
+        return difference <= PRICE_TOLERANCE, detail
 
     if kind == RelationKind.MUTUALLY_EXCLUSIVE:
         total = lp + rp
@@ -147,11 +147,11 @@ def _price_check(
     left_is_tighter = _strictness_key(lt) > _strictness_key(rt)
     tighter_price, looser_price = (lp, rp) if left_is_tighter else (rp, lp)
     ok = tighter_price <= looser_price + PRICE_TOLERANCE
-    return (
-        ok,
+    detail = (
         f"Tighter-threshold YES price is {tighter_price:.3f}; "
-        f"looser-threshold YES price is {looser_price:.3f}.",
+        f"looser-threshold YES price is {looser_price:.3f}."
     )
+    return ok, detail
 
 
 def _relation(
