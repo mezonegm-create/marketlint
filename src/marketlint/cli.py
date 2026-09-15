@@ -6,16 +6,16 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from marketlint.adapters.polymarket import _slug_from_url, fetch_markets
+from marketlint.adapters.polymarket import fetch_markets, parse_polymarket_url
 from marketlint.linter import lint_market
-from marketlint.models import EventReport
+from marketlint.models import EventReport, LintReport
 from marketlint.relations import analyze_relations
 
 app = typer.Typer(no_args_is_help=True, help="Lint and debug prediction markets.")
 console = Console()
 
 
-def _render_market(report) -> None:
+def _render_market(report: LintReport) -> None:
     market = report.market
     console.print(f"\n[bold]{market.question}[/bold]")
     console.print(f"Platform: {market.platform}  |  Market ID: {market.market_id or '-'}")
@@ -44,18 +44,21 @@ def _render_market(report) -> None:
         console.print("\n[green]No findings from the currently implemented lint rules.[/green]")
 
 
-@app.command()
-def lint(url: str, json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON.")) -> None:
-    """Inspect a Polymarket market or all child markets in an event."""
+def _build_report(url: str) -> EventReport:
+    markets = fetch_markets(url)
+    reports = [lint_market(market) for market in markets]
+    _, slug = parse_polymarket_url(url)
+    return EventReport(
+        url=url,
+        slug=slug,
+        markets=reports,
+        relations=analyze_relations(markets),
+    )
+
+
+def _run(url: str, json_output: bool) -> None:
     try:
-        markets = fetch_markets(url)
-        reports = [lint_market(market) for market in markets]
-        event = EventReport(
-            url=url,
-            slug=_slug_from_url(url),
-            markets=reports,
-            relations=analyze_relations(markets),
-        )
+        event = _build_report(url)
     except Exception as exc:
         console.print(f"[red]MarketLint failed:[/red] {exc}")
         raise typer.Exit(code=2) from exc
@@ -64,15 +67,18 @@ def lint(url: str, json_output: bool = typer.Option(False, "--json", help="Emit 
         typer.echo(json.dumps(event.model_dump(mode="json"), indent=2, ensure_ascii=False))
         raise typer.Exit(code=1 if event.has_errors else 0)
 
-    if len(reports) > 1:
-        console.print(f"\n[bold]Event: {event.slug}[/bold] — {len(reports)} child markets")
-    for report in reports:
+    if len(event.markets) > 1:
+        console.print(f"\n[bold]Event: {event.slug}[/bold] — {len(event.markets)} child markets")
+    for report in event.markets:
         _render_market(report)
 
     if event.relations:
         relations = Table("Kind", "Markets", "Price check", "Relation")
         for item in event.relations:
-            pair = f"{item.left_market_id or '-'} ↔ {item.right_market_id or '-'}"
+            if item.kind.value == "implies" and item.antecedent_market_id:
+                pair = f"{item.antecedent_market_id} → {item.consequent_market_id or '-'}"
+            else:
+                pair = f"{item.left_market_id or '-'} ↔ {item.right_market_id or '-'}"
             if item.price_consistent is True:
                 price_check = "PASS"
             elif item.price_consistent is False:
@@ -87,6 +93,24 @@ def lint(url: str, json_output: bool = typer.Option(False, "--json", help="Emit 
         console.print(relations)
 
     raise typer.Exit(code=1 if event.has_errors else 0)
+
+
+@app.command()
+def lint(
+    url: str,
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Lint a Polymarket market or all child markets in an event."""
+    _run(url, json_output)
+
+
+@app.command()
+def inspect(
+    url: str,
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+) -> None:
+    """Inspect a Polymarket market or event; alias for lint."""
+    _run(url, json_output)
 
 
 if __name__ == "__main__":
