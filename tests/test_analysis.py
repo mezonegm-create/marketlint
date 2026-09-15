@@ -1,6 +1,7 @@
 from marketlint.counterexamples import generate_counterexamples
 from marketlint.linter import lint_market
-from marketlint.models import Market, TestStatus as MarketTestStatus
+from marketlint.models import Market
+from marketlint.models import TestStatus as MarketTestStatus
 from marketlint.normalizer import normalize_rules
 
 
