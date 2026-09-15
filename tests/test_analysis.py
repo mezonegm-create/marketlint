@@ -1,6 +1,6 @@
 from marketlint.counterexamples import generate_counterexamples
 from marketlint.linter import lint_market
-from marketlint.models import Market, TestStatus
+from marketlint.models import Market, TestStatus as MarketTestStatus
 from marketlint.normalizer import normalize_rules
 
 
@@ -40,10 +40,10 @@ def test_counterexample_covers_source_unavailable():
 def test_market_tests_are_auditable():
     report = lint_market(market())
     source_test = next(item for item in report.tests if item.code == "MT002")
-    assert source_test.status == TestStatus.PASS
+    assert source_test.status == MarketTestStatus.PASS
 
 
 def test_missing_timezone_creates_warning_test():
     report = lint_market(market(resolution_rules="BTC must exceed $150,000 before December 31."))
     timezone_test = next(item for item in report.tests if item.code == "MT003")
-    assert timezone_test.status == TestStatus.WARNING
+    assert timezone_test.status == MarketTestStatus.WARNING
