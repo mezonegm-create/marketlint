@@ -78,6 +78,8 @@ class MarketRelation(BaseModel):
     right_market_id: str | None = None
     title: str
     detail: str
+    price_consistent: bool | None = None
+    price_detail: str | None = None
 
 
 class LintReport(BaseModel):
