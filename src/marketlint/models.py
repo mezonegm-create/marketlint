@@ -76,8 +76,11 @@ class MarketRelation(BaseModel):
     severity: Severity
     left_market_id: str | None = None
     right_market_id: str | None = None
+    antecedent_market_id: str | None = None
+    consequent_market_id: str | None = None
     title: str
     detail: str
+    evidence: list[str] = Field(default_factory=list)
     price_consistent: bool | None = None
     price_detail: str | None = None
 
