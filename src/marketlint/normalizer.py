@@ -4,10 +4,16 @@ import re
 
 from marketlint.models import Market, NormalizedRules
 
-TIMEZONE = re.compile(r"\b(UTC|GMT|ET|EST|EDT|CT|CST|CDT|PT|PST|PDT)\b", re.I)
-BOUNDARY = re.compile(r"\b(before|after|by|until|above|below|exceed|at least|at most|more than|less than)\b", re.I)
-EXACT = re.compile(r"\b(exactly|equal(?:s)?|equal to)\b", re.I)
-FALLBACK = re.compile(r"\b(if unavailable|fallback|otherwise|in the event|if no|if .* unavailable)\b", re.I)
+TIMEZONE = re.compile(r"\b(UTC|GMT|ET|EST|EDT|CT|CST|CDT|PT|PST|PDT)\b", re.IGNORECASE)
+BOUNDARY = re.compile(
+    r"\b(before|after|by|until|above|below|exceed|at least|at most|more than|less than)\b",
+    re.IGNORECASE,
+)
+EXACT = re.compile(r"\b(exactly|equal(?:s)?|equal to)\b", re.IGNORECASE)
+FALLBACK = re.compile(
+    r"\b(if unavailable|fallback|otherwise|in the event|if no|if .* unavailable)\b",
+    re.IGNORECASE,
+)
 
 
 def normalize_rules(market: Market) -> NormalizedRules:
