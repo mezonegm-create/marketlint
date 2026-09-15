@@ -11,7 +11,8 @@ GAMMA_API = "https://gamma-api.polymarket.com"
 _ALLOWED_HOSTS = {"polymarket.com", "www.polymarket.com"}
 
 
-def _parse_url(url: str) -> tuple[str, str]:
+def parse_polymarket_url(url: str) -> tuple[str, str]:
+    """Validate a Polymarket URL and return its resource kind and slug."""
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or parsed.hostname not in _ALLOWED_HOSTS:
         raise ValueError("Expected a polymarket.com market or event URL")
@@ -22,14 +23,6 @@ def _parse_url(url: str) -> tuple[str, str]:
             if idx + 1 < len(parts):
                 return kind, parts[idx + 1]
     raise ValueError("Polymarket URL must contain /event/<slug> or /market/<slug>")
-
-
-def _slug_from_url(url: str) -> str:
-    return _parse_url(url)[1]
-
-
-def _is_event_url(url: str) -> bool:
-    return _parse_url(url)[0] == "event"
 
 
 def _json_list(value: object) -> list:
@@ -91,7 +84,7 @@ def _get_market(client: httpx.Client, slug: str) -> dict | None:
 
 def fetch_markets(url: str, client: httpx.Client | None = None) -> list[Market]:
     """Fetch one market or every child market belonging to a Polymarket event."""
-    kind, slug = _parse_url(url)
+    kind, slug = parse_polymarket_url(url)
     owns_client = client is None
     client = client or httpx.Client(timeout=15, follow_redirects=True)
     try:
