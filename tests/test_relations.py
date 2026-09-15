@@ -21,6 +21,9 @@ def test_detects_nested_thresholds():
     ])
     assert len(relations) == 1
     assert relations[0].kind == RelationKind.IMPLIES
+    assert relations[0].antecedent_market_id == "2"
+    assert relations[0].consequent_market_id == "1"
+    assert relations[0].evidence
 
 
 def test_detects_mutually_exclusive_thresholds():
@@ -83,6 +86,8 @@ def test_inclusive_and_strict_boundaries_are_not_duplicates():
     ])
     assert len(relations) == 1
     assert relations[0].kind == RelationKind.IMPLIES
+    assert relations[0].antecedent_market_id == "1"
+    assert relations[0].consequent_market_id == "2"
 
 
 def test_same_boundary_strict_opposites_are_mutually_exclusive():
