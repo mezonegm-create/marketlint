@@ -7,7 +7,10 @@ from marketlint.market_tests import build_market_tests
 from marketlint.models import Finding, LintReport, Market, Severity
 from marketlint.normalizer import normalize_rules
 
-SOURCE_WORDS = re.compile(r"\b(source|according to|reported by|published by|resolution source)\b", re.I)
+SOURCE_WORDS = re.compile(
+    r"\b(source|according to|reported by|published by|resolution source)\b",
+    re.IGNORECASE,
+)
 
 
 def lint_market(market: Market) -> LintReport:
