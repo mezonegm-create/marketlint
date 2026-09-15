@@ -5,9 +5,18 @@ from itertools import combinations
 
 from marketlint.models import Market, MarketRelation, RelationKind, Severity
 
-_NUMBER = re.compile(r"(?:\$|€|£)?\s*([0-9]+(?:\.[0-9]+)?)\s*(%|percent|million|billion|k|m|b)?", re.I)
-_ABOVE = re.compile(r"\b(above|over|more than|exceed(?:s|ed|ing)?|at least|greater than)\b", re.I)
-_BELOW = re.compile(r"\b(below|under|less than|at most|fewer than|lower than)\b", re.I)
+_NUMBER = re.compile(
+    r"(?:\$|€|£)?\s*([0-9]+(?:\.[0-9]+)?)\s*(%|percent|million|billion|k|m|b)?",
+    re.IGNORECASE,
+)
+_ABOVE = re.compile(
+    r"\b(above|over|more than|exceed(?:s|ed|ing)?|at least|greater than)\b",
+    re.IGNORECASE,
+)
+_BELOW = re.compile(
+    r"\b(below|under|less than|at most|fewer than|lower than)\b",
+    re.IGNORECASE,
+)
 
 
 def _threshold(question: str) -> tuple[str, float] | None:
@@ -49,8 +58,7 @@ def _similar_topic(left: Market, right: Market) -> bool:
 def analyze_relations(markets: list[Market]) -> list[MarketRelation]:
     """Find deterministic logical tensions among sibling markets.
 
-    This intentionally handles only relations that can be justified without an
-    LLM. Unknown relationships are left unclassified rather than guessed.
+    Unknown relationships are deliberately left unclassified rather than guessed.
     """
     relations: list[MarketRelation] = []
     for left, right in combinations(markets, 2):
