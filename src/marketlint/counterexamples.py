@@ -4,8 +4,8 @@ import re
 
 from marketlint.models import Counterexample, Market, NormalizedRules
 
-STRICT = re.compile(r"\b(above|below|exceed|more than|less than|before|after)\b", re.I)
-INCLUSIVE = re.compile(r"\b(at least|at most|by|until)\b", re.I)
+STRICT = re.compile(r"\b(above|below|exceed|more than|less than|before|after)\b", re.IGNORECASE)
+INCLUSIVE = re.compile(r"\b(at least|at most|by|until)\b", re.IGNORECASE)
 
 
 def generate_counterexamples(market: Market, rules: NormalizedRules) -> list[Counterexample]:
