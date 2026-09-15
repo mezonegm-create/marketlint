@@ -115,6 +115,11 @@ def _strictness_key(threshold: Threshold) -> tuple[float, int]:
     return -threshold.value, int(threshold.comparator == Comparator.LT)
 
 
+def _threshold_evidence(threshold: Threshold) -> str:
+    unit = threshold.unit or "unitless"
+    return f"comparator={threshold.comparator.value}, value={threshold.value:g}, unit={unit}"
+
+
 def _price_check(
     kind: RelationKind,
     left: Market,
@@ -159,6 +164,8 @@ def _relation(
     severity: Severity,
     title: str,
     detail: str,
+    antecedent: Market | None = None,
+    consequent: Market | None = None,
 ) -> MarketRelation:
     price_consistent, price_detail = _price_check(kind, left, right, lt, rt)
     if price_consistent is False:
@@ -168,8 +175,14 @@ def _relation(
         severity=severity,
         left_market_id=left.market_id,
         right_market_id=right.market_id,
+        antecedent_market_id=antecedent.market_id if antecedent else None,
+        consequent_market_id=consequent.market_id if consequent else None,
         title=title,
         detail=detail,
+        evidence=[
+            f"left: {_threshold_evidence(lt)}",
+            f"right: {_threshold_evidence(rt)}",
+        ],
         price_consistent=price_consistent,
         price_detail=price_detail,
     )
@@ -184,7 +197,6 @@ def _mutually_exclusive(lt: Threshold, rt: Threshold) -> bool:
         return True
     if above.value < below.value:
         return False
-    # At the same boundary, both can be true only when both include equality.
     return not (
         above.comparator == Comparator.GTE and below.comparator == Comparator.LTE
     )
@@ -244,6 +256,8 @@ def analyze_relations(markets: list[Market]) -> list[MarketRelation]:
                         f"YES on market {tighter.market_id or 'tighter'} implies YES on market "
                         f"{looser.market_id or 'looser'}, assuming identical resolution scope."
                     ),
+                    antecedent=tighter,
+                    consequent=looser,
                 )
             )
     return relations
