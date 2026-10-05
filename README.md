@@ -132,3 +132,15 @@ MIT. See `LICENSE`.
 ---
 
 *Try to break the market before the market breaks your assumptions.*
+
+
+## Resolution hardening
+
+MarketLint also checks for:
+- broad or multiple resolution sources without a stated priority when sources disagree (`ML009`)
+- human deadline phrases such as “by Friday” or “end of day” without a detected timezone (`ML010`)
+- mentioned cancellation, postponement, tie, or missing-result edge cases without explicit resolution behavior (`ML011`)
+- complementary threshold markets whose YES prices should sum to approximately 1, in addition to nested, duplicate, and mutually exclusive relations
+- regression cases that preserve detection behavior across future releases
+
+These checks identify structural resolution and consistency risks. They do not predict outcomes or guarantee profitable trades.
