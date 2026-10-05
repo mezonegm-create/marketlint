@@ -71,6 +71,13 @@ class Counterexample(BaseModel):
     question: str
 
 
+class RiskSummary(BaseModel):
+    level: str
+    errors: int = 0
+    warnings: int = 0
+    info: int = 0
+
+
 class MarketRelation(BaseModel):
     kind: RelationKind
     severity: Severity
@@ -91,6 +98,7 @@ class LintReport(BaseModel):
     normalized_rules: NormalizedRules | None = None
     tests: list[MarketTest] = Field(default_factory=list)
     counterexamples: list[Counterexample] = Field(default_factory=list)
+    risk_summary: RiskSummary | None = None
 
     @property
     def has_errors(self) -> bool:
