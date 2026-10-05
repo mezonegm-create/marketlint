@@ -11,7 +11,7 @@ MarketLint is an open-source, read-only linter and debugger for prediction marke
 - Fetch a Polymarket market or every child market in an event.
 - Validate Polymarket URLs and ingest public Gamma API data without a wallet or API key.
 - Normalize resolution rules, deadlines, timezones, sources, and fallback language.
-- Run deterministic lint checks with stable finding codes.\n- Flag potentially subjective resolution terms when no objective definition is detected.
+- Run deterministic lint checks with stable finding codes.\n- Flag potentially subjective resolution terms when no objective definition is detected.\n- Flag revision-sensitive data when the rules do not say which release or revision controls resolution.\n- Emit a deterministic per-market resolution-risk summary in both CLI and JSON output.
 - Generate auditable Market Unit Tests.
 - Generate counterexamples for exact boundaries, timezone edges, source conflicts, and source outages.
 - Compare sibling threshold markets for duplicates, implication, and mutual exclusion.
@@ -57,7 +57,7 @@ A report can contain:
 - `counterexamples` — concrete edge cases worth checking against the contract wording.
 - `relations` — cross-market duplicate, implication, and mutual-exclusion relationships.
 - `evidence` — parsed facts used to support deterministic relation analysis.
-- `price_consistent` / `price_detail` — structural price-consistency signals when comparable YES prices are available.
+- `price_consistent` / `price_detail` — structural price-consistency signals when comparable YES prices are available.\n- `risk_summary` — deterministic `low`, `review`, `elevated`, or `high` resolution-risk level plus finding counts.
 
 For implication relations, `antecedent_market_id` identifies the tighter condition and `consequent_market_id` identifies the condition it logically implies, assuming the markets share the same resolution scope.
 
@@ -70,7 +70,7 @@ For implication relations, `antecedent_market_id` identifies the tighter conditi
 | ML003 | Resolution source is not explicit |
 | ML004 | Outcomes are unavailable |
 | ML005 | Outcome/price shapes do not match |
-| ML006 | No explicit source fallback is described |\n| ML007 | Potentially subjective resolution language lacks an objective definition |
+| ML006 | No explicit source fallback is described |\n| ML007 | Potentially subjective resolution language lacks an objective definition |\n| ML008 | Revision-sensitive data lacks a clear first/final/revision policy |
 
 The rule set will grow while keeping codes stable wherever practical.
 
