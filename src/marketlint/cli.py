@@ -18,7 +18,7 @@ console = Console()
 def _render_market(report: LintReport) -> None:
     market = report.market
     console.print(f"\n[bold]{market.question}[/bold]")
-    console.print(f"Platform: {market.platform}  |  Market ID: {market.market_id or '-'}")
+    console.print(f"Platform: {market.platform}  |  Market ID: {market.market_id or '-'}")\n    if report.risk_summary:\n        summary = report.risk_summary\n        console.print(\n            f"Resolution risk: [bold]{summary.level.upper()}[/bold]  |  "\n            f"{summary.errors} errors, {summary.warnings} warnings, {summary.info} info"\n        )
 
     findings = Table("Code", "Severity", "Finding")
     for item in report.findings:
