@@ -17,31 +17,42 @@ console = Console()
 
 def _render_market(report: LintReport) -> None:
     market = report.market
-    console.print(f"\n[bold]{market.question}[/bold]")
-    console.print(f"Platform: {market.platform}  |  Market ID: {market.market_id or '-'}")\n    if report.risk_summary:\n        summary = report.risk_summary\n        console.print(\n            f"Resolution risk: [bold]{summary.level.upper()}[/bold]  |  "\n            f"{summary.errors} errors, {summary.warnings} warnings, {summary.info} info"\n        )
+    console.print(f"
+[bold]{market.question}[/bold]")
+    console.print(f"Platform: {market.platform}  |  Market ID: {market.market_id or '-'}")
+    if report.risk_summary:
+        summary = report.risk_summary
+        console.print(
+            f"Resolution risk: [bold]{summary.level.upper()}[/bold]  |  "
+            f"{summary.errors} errors, {summary.warnings} warnings, {summary.info} info"
+        )
 
     findings = Table("Code", "Severity", "Finding")
     for item in report.findings:
         findings.add_row(item.code, item.severity.value.upper(), item.title)
     if report.findings:
-        console.print("\n[bold]Findings[/bold]")
+        console.print("
+[bold]Findings[/bold]")
         console.print(findings)
 
     tests = Table("Test", "Status", "Detail")
     for item in report.tests:
         tests.add_row(item.code, item.status.value.upper(), item.detail)
-    console.print("\n[bold]Market Unit Tests[/bold]")
+    console.print("
+[bold]Market Unit Tests[/bold]")
     console.print(tests)
 
     if report.counterexamples:
-        console.print("\n[bold]Counterexamples to inspect[/bold]")
+        console.print("
+[bold]Counterexamples to inspect[/bold]")
         for case in report.counterexamples:
             console.print(f"[bold]{case.code} — {case.title}[/bold]")
             console.print(f"  Scenario: {case.scenario}")
             console.print(f"  Question: {case.question}")
 
     if not report.findings:
-        console.print("\n[green]No findings from the currently implemented lint rules.[/green]")
+        console.print("
+[green]No findings from the currently implemented lint rules.[/green]")
 
 
 def _build_report(url: str) -> EventReport:
@@ -68,7 +79,8 @@ def _run(url: str, json_output: bool) -> None:
         raise typer.Exit(code=1 if event.has_errors else 0)
 
     if len(event.markets) > 1:
-        console.print(f"\n[bold]Event: {event.slug}[/bold] — {len(event.markets)} child markets")
+        console.print(f"
+[bold]Event: {event.slug}[/bold] — {len(event.markets)} child markets")
     for report in event.markets:
         _render_market(report)
 
@@ -89,7 +101,8 @@ def _run(url: str, json_output: bool) -> None:
             if item.price_detail:
                 detail = f"{detail} {item.price_detail}"
             relations.add_row(item.kind.value.upper(), pair, price_check, detail)
-        console.print("\n[bold]Cross-market relations[/bold]")
+        console.print("
+[bold]Cross-market relations[/bold]")
         console.print(relations)
 
     raise typer.Exit(code=1 if event.has_errors else 0)
