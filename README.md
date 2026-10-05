@@ -11,7 +11,7 @@ MarketLint is an open-source, read-only linter and debugger for prediction marke
 - Fetch a Polymarket market or every child market in an event.
 - Validate Polymarket URLs and ingest public Gamma API data without a wallet or API key.
 - Normalize resolution rules, deadlines, timezones, sources, and fallback language.
-- Run deterministic lint checks with stable finding codes.
+- Run deterministic lint checks with stable finding codes.\n- Flag potentially subjective resolution terms when no objective definition is detected.
 - Generate auditable Market Unit Tests.
 - Generate counterexamples for exact boundaries, timezone edges, source conflicts, and source outages.
 - Compare sibling threshold markets for duplicates, implication, and mutual exclusion.
@@ -70,7 +70,7 @@ For implication relations, `antecedent_market_id` identifies the tighter conditi
 | ML003 | Resolution source is not explicit |
 | ML004 | Outcomes are unavailable |
 | ML005 | Outcome/price shapes do not match |
-| ML006 | No explicit source fallback is described |
+| ML006 | No explicit source fallback is described |\n| ML007 | Potentially subjective resolution language lacks an objective definition |
 
 The rule set will grow while keeping codes stable wherever practical.
 
