@@ -23,6 +23,7 @@ class RelationKind(StrEnum):
     DUPLICATE = "duplicate"
     IMPLIES = "implies"
     MUTUALLY_EXCLUSIVE = "mutually_exclusive"
+    EXHAUSTIVE_PAIR = "exhaustive_pair"
 
 
 class Finding(BaseModel):

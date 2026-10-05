@@ -113,3 +113,25 @@ def test_incompatible_units_are_not_related():
         market("2", "Will approval be above $50?"),
     ])
     assert relations == []
+
+
+def test_detects_exhaustive_complementary_pair():
+    relations = analyze_relations([
+        market("1", "Will Bitcoin be above $100000?", 0.55),
+        market("2", "Will Bitcoin be at most $100000?", 0.45),
+    ])
+    assert len(relations) == 1
+    assert relations[0].kind == RelationKind.EXHAUSTIVE_PAIR
+    assert relations[0].price_consistent is True
+
+
+def test_flags_exhaustive_pair_price_tension():
+    relations = analyze_relations([
+        market("1", "Will Bitcoin be at least $100000?", 0.70),
+        market("2", "Will Bitcoin be below $100000?", 0.45),
+    ])
+    assert len(relations) == 1
+    assert relations[0].kind == RelationKind.EXHAUSTIVE_PAIR
+    assert relations[0].price_consistent is False
+    assert relations[0].severity == Severity.WARNING
+    assert "1.150" in relations[0].price_detail

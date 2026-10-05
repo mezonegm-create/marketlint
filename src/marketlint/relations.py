@@ -140,6 +140,11 @@ def _price_check(
         )
         return difference <= PRICE_TOLERANCE, detail
 
+    if kind == RelationKind.EXHAUSTIVE_PAIR:
+        total = lp + rp
+        detail = f"Complementary YES prices sum to {total:.3f}; expected approximately 1.000."
+        return abs(total - 1) <= PRICE_TOLERANCE, detail
+
     if kind == RelationKind.MUTUALLY_EXCLUSIVE:
         total = lp + rp
         return total <= 1 + PRICE_TOLERANCE, f"Mutually exclusive YES prices sum to {total:.3f}."
@@ -202,6 +207,18 @@ def _mutually_exclusive(lt: Threshold, rt: Threshold) -> bool:
     )
 
 
+def _exhaustive_pair(lt: Threshold, rt: Threshold) -> bool:
+    ld, rd = _direction(lt), _direction(rt)
+    if ld == rd or lt.value != rt.value:
+        return False
+    above, below = (lt, rt) if ld == "above" else (rt, lt)
+    return (
+        above.comparator == Comparator.GT and below.comparator == Comparator.LTE
+    ) or (
+        above.comparator == Comparator.GTE and below.comparator == Comparator.LT
+    )
+
+
 def analyze_relations(markets: list[Market]) -> list[MarketRelation]:
     """Find deterministic logical relations and price tensions among siblings."""
     relations: list[MarketRelation] = []
@@ -214,7 +231,23 @@ def analyze_relations(markets: list[Market]) -> list[MarketRelation]:
             continue
 
         ld, rd = _direction(lt), _direction(rt)
-        if lt == rt:
+        if _exhaustive_pair(lt, rt):
+            relations.append(
+                _relation(
+                    kind=RelationKind.EXHAUSTIVE_PAIR,
+                    left=left,
+                    right=right,
+                    lt=lt,
+                    rt=rt,
+                    severity=Severity.INFO,
+                    title="Complementary exhaustive threshold pair",
+                    detail=(
+                        "Exactly one YES outcome should hold under the parsed threshold semantics, "
+                        "assuming identical resolution scope."
+                    ),
+                )
+            )
+        elif lt == rt:
             relations.append(
                 _relation(
                     kind=RelationKind.DUPLICATE,

@@ -30,6 +30,33 @@ REVISION_SENSITIVE = re.compile(
     r"\b(preliminary|initial|advance estimate|provisional|subject to revision|revised)\b",
     re.IGNORECASE,
 )
+SOURCE_AMBIGUITY = re.compile(
+    r"\b(other reliable sources?|other credible sources?|multiple sources?|any reliable source|"
+    r"consensus of sources?|generally accepted sources?)\b",
+    re.IGNORECASE,
+)
+SOURCE_PRIORITY = re.compile(
+    r"\b(primary source|takes precedence|controls resolution|in case of conflict|"
+    r"if sources? disagree|priority|authoritative source)\b",
+    re.IGNORECASE,
+)
+VAGUE_DEADLINE = re.compile(
+    r"\b(end of (?:the )?day|close of business|before (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|"
+    r"by (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|midnight|end of (?:the )?month|"
+    r"end of (?:the )?year)\b",
+    re.IGNORECASE,
+)
+OUTCOME_EDGE_CASE = re.compile(
+    r"\b(cancel(?:led|ed|lation)?|postpon(?:ed|ement)|delayed?|tie|draw|no result|"
+    r"not announced|not released|unavailable|abandoned|void)\b",
+    re.IGNORECASE,
+)
+OUTCOME_POLICY = re.compile(
+    r"\b(in the event of|if .* (?:cancelled|canceled|postponed|delayed|tie|draw)|"
+    r"resolves? (?:yes|no)|will resolve (?:yes|no)|voided|invalid market)\b",
+    re.IGNORECASE,
+)
+
 REVISION_POLICY = re.compile(
     r"\b(first release|initial release|first published|final release|final value|"
     r"latest revision|revisions? (?:will|do) not count|ignore revisions?|"
@@ -108,6 +135,52 @@ def lint_market(market: Market) -> LintReport:
                     "did not detect which publication or revision controls resolution."
                 ),
                 evidence=[f"revision-sensitive term: {term}" for term in terms],
+            )
+        )
+
+
+    if SOURCE_AMBIGUITY.search(text) and not SOURCE_PRIORITY.search(text):
+        findings.append(
+            Finding(
+                code="ML009",
+                severity=Severity.WARNING,
+                title="Multiple or fallback sources without clear priority",
+                detail=(
+                    "The rules allow broad or multiple resolution sources but do not clearly say "
+                    "which source controls if they disagree."
+                ),
+                evidence=["source priority is not explicit"],
+            )
+        )
+
+    if VAGUE_DEADLINE.search(text) and not rules.timezone:
+        deadline = VAGUE_DEADLINE.search(text)
+        findings.append(
+            Finding(
+                code="ML010",
+                severity=Severity.WARNING,
+                title="Deadline language may be ambiguous",
+                detail=(
+                    "The rules use a human deadline expression without a detected timezone or "
+                    "fully explicit boundary."
+                ),
+                evidence=[f"deadline phrase: {deadline.group(0).lower()}"] if deadline else [],
+            )
+        )
+
+    edge_cases = list(OUTCOME_EDGE_CASE.finditer(text))
+    if edge_cases and not OUTCOME_POLICY.search(text):
+        terms = list(dict.fromkeys(match.group(0).lower() for match in edge_cases))
+        findings.append(
+            Finding(
+                code="ML011",
+                severity=Severity.WARNING,
+                title="Outcome edge case mentioned without explicit resolution behavior",
+                detail=(
+                    "The rules mention an exceptional outcome such as cancellation, delay, tie, "
+                    "or missing data without clearly stating how the market resolves."
+                ),
+                evidence=[f"edge case: {term}" for term in terms],
             )
         )
 

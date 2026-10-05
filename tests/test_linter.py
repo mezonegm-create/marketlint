@@ -121,3 +121,65 @@ def test_risk_summary_is_machine_readable():
     assert report.risk_summary.warnings >= 1
     dumped = report.model_dump(mode="json")
     assert dumped["risk_summary"]["level"] in {"low", "review", "elevated", "high"}
+
+
+def test_flags_multiple_sources_without_priority():
+    report = lint_market(
+        market(
+            resolution_rules=(
+                "According to Example Source or other reliable sources, X must happen "
+                "before 23:59 UTC on December 31."
+            ),
+            resolution_source="Example Source",
+        )
+    )
+    assert any(item.code == "ML009" for item in report.findings)
+
+
+def test_source_priority_suppresses_ambiguity_warning():
+    report = lint_market(
+        market(
+            resolution_rules=(
+                "According to Example Source or other reliable sources, Example Source "
+                "takes precedence if sources disagree."
+            ),
+            resolution_source="Example Source",
+        )
+    )
+    assert not any(item.code == "ML009" for item in report.findings)
+
+
+def test_flags_vague_deadline_without_timezone():
+    report = lint_market(
+        market(
+            resolution_rules="According to Example Source, X must happen by Friday.",
+            resolution_source="Example Source",
+        )
+    )
+    assert any(item.code == "ML010" for item in report.findings)
+
+
+def test_flags_unhandled_outcome_edge_case():
+    report = lint_market(
+        market(
+            resolution_rules=(
+                "According to Example Source, the scheduled event may be postponed. "
+                "Results are checked after the event."
+            ),
+            resolution_source="Example Source",
+        )
+    )
+    assert any(item.code == "ML011" for item in report.findings)
+
+
+def test_explicit_edge_case_policy_is_not_flagged():
+    report = lint_market(
+        market(
+            resolution_rules=(
+                "According to Example Source, if the event is postponed the market will "
+                "resolve No."
+            ),
+            resolution_source="Example Source",
+        )
+    )
+    assert not any(item.code == "ML011" for item in report.findings)
