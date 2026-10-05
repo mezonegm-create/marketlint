@@ -43,3 +43,45 @@ def test_clean_structural_market_has_no_errors():
         )
     )
     assert not report.has_errors
+
+
+def test_flags_undefined_subjective_resolution_language():
+    report = lint_market(
+        market(
+            question="Will there be a major disruption before December 31?",
+            resolution_rules=(
+                "According to Example Source, the market resolves Yes if a major disruption "
+                "occurs before 23:59 UTC on December 31."
+            ),
+            resolution_source="Example Source",
+        )
+    )
+    finding = next(item for item in report.findings if item.code == "ML007")
+    assert finding.severity == Severity.WARNING
+    assert "subjective term: major" in finding.evidence
+
+
+def test_subjective_term_with_objective_definition_is_not_flagged():
+    report = lint_market(
+        market(
+            question="Will there be a major disruption before December 31?",
+            resolution_rules=(
+                "According to Example Source, major is defined as an outage affecting at least "
+                "1,000,000 users before 23:59 UTC on December 31."
+            ),
+            resolution_source="Example Source",
+        )
+    )
+    assert not any(item.code == "ML007" for item in report.findings)
+
+
+def test_subjective_terms_are_deduplicated_in_evidence():
+    report = lint_market(
+        market(
+            question="Will a significant event occur?",
+            resolution_rules="A significant event must be reported by Example Source. Significant events qualify.",
+            resolution_source="Example Source",
+        )
+    )
+    finding = next(item for item in report.findings if item.code == "ML007")
+    assert finding.evidence == ["subjective term: significant"]
