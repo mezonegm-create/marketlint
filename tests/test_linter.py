@@ -85,3 +85,39 @@ def test_subjective_terms_are_deduplicated_in_evidence():
     )
     finding = next(item for item in report.findings if item.code == "ML007")
     assert finding.evidence == ["subjective term: significant"]
+
+
+def test_flags_revision_sensitive_data_without_policy():
+    report = lint_market(
+        market(
+            resolution_rules=(
+                "According to Example Source, this resolves using the preliminary GDP estimate "
+                "published before 23:59 UTC on December 31."
+            ),
+            resolution_source="Example Source",
+        )
+    )
+    finding = next(item for item in report.findings if item.code == "ML008")
+    assert finding.severity == Severity.WARNING
+    assert "revision-sensitive term: preliminary" in finding.evidence
+
+
+def test_revision_sensitive_data_with_policy_is_not_flagged():
+    report = lint_market(
+        market(
+            resolution_rules=(
+                "According to Example Source, this resolves using the preliminary GDP estimate. "
+                "The first release controls resolution and later revisions will not count."
+            ),
+            resolution_source="Example Source",
+        )
+    )
+    assert not any(item.code == "ML008" for item in report.findings)
+
+
+def test_risk_summary_is_machine_readable():
+    report = lint_market(market())
+    assert report.risk_summary is not None
+    assert report.risk_summary.warnings >= 1
+    dumped = report.model_dump(mode="json")
+    assert dumped["risk_summary"]["level"] in {"low", "review", "elevated", "high"}
